@@ -4,6 +4,7 @@ from analysis import charts as ch
 from etl import extract as ext
 from etl import load as ld
 from etl import transform as tf
+from etl import rl 
 
 
 HISTORICAL_DASHBOARDS = {
@@ -20,8 +21,8 @@ MENU_OPTIONS = {
     "3": ("Dashboard de preco", "price_dashboard"),
     "4": ("Intraday", "intraday"),
     "5": ("Log-retornos", "log_returns"),
-    "6": ("Fear & Greed", "fear_and_greed"),
-    "7": ("Mayer Multiple", "mayer_multiple"),
+    "6": ("Mayer Multiple", "mayer_multiple"),
+    "7": ("Relatório", "relatório"),
     "8": ("Halving", "halving"),
     "9": ("Atualizar banco novamente", "refresh"),
     "0": ("Sair", "exit"),
@@ -135,12 +136,14 @@ def open_log_returns():
     ch.plot_log_returns(table_name).show()
 
 
-def open_fear_and_greed():
+def relatorio():
     """
-    Abre o painel de sentimento Fear & Greed.
+    Envia um Relatório no Email 
     """
-    print_section("Fear & Greed")
-    ch.plot_fear_and_greed("btc_macro_10anos").show()
+    print("Enviando Relatório")
+    dados_mercado = rl.extrair_contexto()
+    html = rl.gerar_analise_ia(dados_mercado)
+    rl.disparar_email(html, dados_mercado)
 
 
 def open_mayer_multiple():
@@ -198,8 +201,8 @@ def dispatch(action):
         "price_dashboard": open_dashboard,
         "intraday": open_intraday,
         "log_returns": open_log_returns,
-        "fear_and_greed": open_fear_and_greed,
         "mayer_multiple": open_mayer_multiple,
+        "relatório": relatorio,
         "halving": open_halving,
         "refresh": run_pipeline,
     }
@@ -236,4 +239,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
     
