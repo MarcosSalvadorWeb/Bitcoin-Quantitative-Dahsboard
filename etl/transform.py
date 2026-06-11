@@ -2,6 +2,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from yfinance import data
 
 
 BR_TZ = "America/Sao_Paulo"
@@ -174,6 +175,25 @@ def intraday_data(dados_intraday):
 
     return hourly.rename(columns={"hora": "data"})[["data", "price_USD"]]
 
+def Drawdown(df):
+    """
+    Recebe o DataFrame limpo do banco e adiciona o Drawdown, que representa a queda percentual do preço em relação ao pico anterior.
+    """
+    df = df.copy()
+    preço_max_acumulado = df["price_USD"].cummax()
+    df["drawdown"] = (df["price_USD"] - preço_max_acumulado) / preço_max_acumulado
+    return df
+
+def Z_ScoreMM200(df):
+    """_
+    Recebe o DataFrame limpo do banco e adiciona o Z-Score da MM200, que indica quantos desvios padrão o preço atual está acima ou abaixo da média móvel de 200 dias.
+    """
+    df = df.copy()
+    mm200 = df["price_USD"].rolling(window=200).mean()
+    std200 = df["price_USD"].rolling(window=200).std()
+    df["z_score_200"] = (df["price_USD"] - mm200) / std200
+    return df
+
 
 def clean_data(dados_brutos_precos, dados_brutos_fng=None, dados_intraday=None):
     """
@@ -183,7 +203,8 @@ def clean_data(dados_brutos_precos, dados_brutos_fng=None, dados_intraday=None):
         raise ValueError("Historico de precos da CoinGecko vazio ou invalido.")
 
     df_prices = _prices_to_dataframe(dados_brutos_precos["prices"])
-    df_quant = mayer_multiple(retorno_log(df_prices))
+    
+    df_quant = Z_ScoreMM200(Drawdown(mayer_multiple(retorno_log(df_prices))))
 
     df_fng = transform_fear_and_greed(dados_brutos_fng)
 

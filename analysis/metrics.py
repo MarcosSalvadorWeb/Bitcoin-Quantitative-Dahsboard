@@ -45,3 +45,5 @@ def plot_bitcoin_trend_matplot(days=30):
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
+
+

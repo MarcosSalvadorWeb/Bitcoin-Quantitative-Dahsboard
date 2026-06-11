@@ -634,3 +634,167 @@ def plot_halving_analysis():
     fig.update_yaxes(title_text="Retorno (%)", ticksuffix="%", row=1, col=2)
 
     return fig
+
+
+def plot_principal_dashboard():
+    """
+    Dashboard Executivo Quantitativo.
+    Apresenta KPIs macro, Ação de Preço (1 Ano com zoom para 1M/3M) e Volatilidade.
+    """
+    # 1. Base ampliada para 1 Ano para permitir zoom dinâmico
+    df_base = get_data_from_db("btc_1ano")
+    df_macro = get_data_from_db("btc_macro_10anos")
+
+    # --- EXTRAÇÃO DE MÉTRICAS ATUAIS ---
+    current_price = df_base[PRICE_COLUMN].iloc[-1]
+    
+    current_mayer = df_macro["mayer_multiple"].dropna().iloc[-1]
+    current_zscore = df_macro["z_score_200"].dropna().iloc[-1]
+    current_drawdown = df_macro["drawdown"].dropna().iloc[-1]
+    current_fng = df_macro["fng_value"].dropna().iloc[-1]
+    fng_class = df_macro["fng_classification"].dropna().iloc[-1]
+
+    # --- CONFIGURAÇÃO DO GRID ---
+    fig = make_subplots(
+        rows=3, cols=5,
+        specs=[
+            [{"type": "indicator"}, {"type": "indicator"}, {"type": "indicator"}, {"type": "indicator"}, {"type": "indicator"}],
+            [{"type": "xy", "colspan": 5}, None, None, None, None],
+            [{"type": "xy", "colspan": 5}, None, None, None, None]
+        ],
+        row_heights=[0.18, 0.60, 0.22],
+        vertical_spacing=0.08,
+        subplot_titles=("", "", "", "", "", "Ação de Preço (Selecione o Período)", "Volatilidade Diária (Log-Retornos)")
+    )
+
+    # ==========================================
+    # ANDAR 1: KPIs (Termômetros do Mercado)
+    # ==========================================
+
+    # 1. Preço Atual [Trace 0]
+    fig.add_trace(go.Indicator(
+        mode="number", value=current_price,
+        number={"prefix": "US$ ", "valueformat": ",.0f", "font": {"size": 28, "color": INK, "family": "Arial Black"}},
+        title={"text": "PREÇO ATUAL", "font": {"size": 11, "color": MUTED, "family": "Arial"}}
+    ), row=1, col=1)
+
+    # 2. Múltiplo de Mayer [Trace 1]
+    mayer_color = POSITIVE_GREEN if current_mayer < 1.0 else (NEGATIVE_RED if current_mayer > 2.4 else INK)
+    fig.add_trace(go.Indicator(
+        mode="number", value=current_mayer,
+        number={"valueformat": ".2f", "font": {"size": 28, "color": mayer_color, "family": "Arial Black"}},
+        title={"text": "MÚLTIPLO DE MAYER", "font": {"size": 11, "color": MUTED}}
+    ), row=1, col=2)
+
+    # 3. Z-Score (MM200) [Trace 2]
+    zscore_color = NEGATIVE_RED if current_zscore > 2 else (POSITIVE_GREEN if current_zscore < -2 else INK)
+    fig.add_trace(go.Indicator(
+        mode="number", value=current_zscore,
+        number={"valueformat": "+.2f", "font": {"size": 28, "color": zscore_color, "family": "Arial Black"}},
+        title={"text": "Z-SCORE (MM200)", "font": {"size": 11, "color": MUTED}}
+    ), row=1, col=3)
+
+    # 4. Drawdown [Trace 3]
+    drawdown_color = POSITIVE_GREEN if current_drawdown >= -0.15 else NEGATIVE_RED
+    fig.add_trace(go.Indicator(
+        mode="number", value=current_drawdown,
+        number={"valueformat": ".1%", "font": {"size": 28, "color": drawdown_color, "family": "Arial Black"}},
+        title={"text": "DRAWDOWN ATUAL", "font": {"size": 11, "color": MUTED}}
+    ), row=1, col=4)
+
+    # 5. Fear & Greed [Trace 4]
+    fng_color = NEGATIVE_RED if current_fng < 40 else (POSITIVE_GREEN if current_fng > 70 else INK)
+    fig.add_trace(go.Indicator(
+        mode="number", value=current_fng,
+        number={"font": {"size": 28, "color": fng_color, "family": "Arial Black"}},
+        title={"text": f"FEAR & GREED<br><span style='font-size:10px;color:{MUTED}'>{fng_class.upper()}</span>", "font": {"size": 11, "color": MUTED}}
+    ), row=1, col=5)
+
+    # ==========================================
+    # ANDAR 2: TENDÊNCIA (Preço e Médias)
+    # ==========================================
+
+    # Linha do Preço [Trace 5]
+    line_color = choose_color(df_base)
+    fig.add_trace(go.Scatter(
+        x=df_base["data"], y=df_base[PRICE_COLUMN],
+        mode="lines", name="Preço BTC",
+        line={"color": line_color, "width": 2.5},
+        fill="tozeroy", fillcolor="rgba(247, 147, 26, 0.05)",
+        hovertemplate="<b>%{x|%d/%m/%Y}</b><br>US$ %{y:,.2f}<extra></extra>"
+    ), row=2, col=1)
+
+    # Calcula as médias no macro para não ter buracos no inicio do df_base
+    df_macro_tail = df_macro.tail(len(df_base)).copy()
+    mm21 = df_macro[PRICE_COLUMN].rolling(window=21).mean().tail(len(df_base))
+    mm200 = df_macro[PRICE_COLUMN].rolling(window=200).mean().tail(len(df_base))
+
+    # MM21 [Trace 6]
+    fig.add_trace(go.Scatter(
+        x=df_base["data"], y=mm21,
+        mode="lines", name="MM 21", visible=True,
+        line={"color": "#2563EB", "width": 2}, # Azul corporativo
+        hovertemplate="<b>MM21:</b> US$ %{y:,.2f}<extra></extra>"
+    ), row=2, col=1)
+
+    # MM200 [Trace 7]
+    fig.add_trace(go.Scatter(
+        x=df_base["data"], y=mm200,
+        mode="lines", name="MM 200", visible=False,
+        line={"color": "#9333EA", "width": 2}, # Roxo institucional
+        hovertemplate="<b>MM200:</b> US$ %{y:,.2f}<extra></extra>"
+    ), row=2, col=1)
+
+    # ==========================================
+    # ANDAR 3: VOLATILIDADE (Log-Retornos)
+    # ==========================================
+    log_returns_pct = df_base[LOG_RETURN_COLUMN] * 100
+    bar_colors = [POSITIVE_GREEN if val >= 0 else NEGATIVE_RED for val in log_returns_pct]
+    
+    # Log-Retornos [Trace 8]
+    fig.add_trace(go.Bar(
+        x=df_base["data"], y=log_returns_pct,
+        name="Log-Retorno", marker={"color": bar_colors, "line": {"width": 0}},
+        hovertemplate="<b>%{x|%d/%m/%Y}</b><br>Retorno: %{y:.2f}%<extra></extra>"
+    ), row=3, col=1)
+
+    # --- FORMATAÇÃO VISUAL E MENUS ---
+    fig.update_layout(
+        title={
+            "text": "<b>DASHBOARD QUANTITATIVO - BITCOIN</b><br><span style='font-size:13px;color:#667085'>Consolidação Analítica de Tendência, Risco e Volatilidade</span>",
+            "x": 0.04, "y": 0.96, "xanchor": "left", "font": {"size": 22, "family": "Arial", "color": INK},
+        },
+        height=900, paper_bgcolor="#F8FAFC", plot_bgcolor=PANEL,
+        font={"family": "Arial", "size": 12, "color": INK},
+        hovermode="x unified", showlegend=False,
+        margin={"l": 60, "r": 60, "t": 130, "b": 60},
+        
+        # Botão seletor de Médias Móveis (Top Direito)
+        updatemenus=[{
+            "type": "buttons", "direction": "left", "x": 1.0, "y": 1.05, "xanchor": "right", "yanchor": "bottom",
+            "showactive": True, "bgcolor": "#FFFFFF", "bordercolor": GRID,
+            "buttons": [
+                {"label": "📊 MM 21 (Curto)", "method": "update", "args": [{"visible": [True]*6 + [True, False, True]}]},
+                {"label": "📈 MM 200 (Longo)", "method": "update", "args": [{"visible": [True]*6 + [False, True, True]}]},
+            ],
+        }],
+    )
+
+    # Botões Seletores de Tempo (Timeframes) no eixo X
+    time_buttons = [
+        dict(count=1, label="1M", step="month", stepmode="backward"),
+        dict(count=3, label="3M", step="month", stepmode="backward"),
+        dict(count=6, label="6M", step="month", stepmode="backward"),
+        dict(step="all", label="1A (Tudo)")
+    ]
+
+    fig.update_xaxes(
+        showgrid=True, gridcolor=GRID, row=2, col=1,
+        rangeselector=dict(buttons=time_buttons, bgcolor="#F2F4F7", activecolor="#E4E7EC", font={"color": INK})
+    )
+    fig.update_yaxes(title_text="Preço (USD)", tickprefix="US$ ", showgrid=True, gridcolor=GRID, zeroline=False, row=2, col=1)
+    
+    fig.update_xaxes(showgrid=True, gridcolor=GRID, row=3, col=1)
+    fig.update_yaxes(title_text="Retorno (%)", ticksuffix="%", showgrid=True, gridcolor=GRID, zeroline=True, zerolinecolor="#98A2B3", zerolinewidth=1.5, row=3, col=1)
+
+    return fig

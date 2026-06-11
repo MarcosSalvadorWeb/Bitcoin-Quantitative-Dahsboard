@@ -13,15 +13,17 @@ HISTORICAL_DASHBOARDS = {
     "4": ("btc_macro_10anos", "Macro 10 Anos"),
 }
 
+# Reorganizado para dar destaque ao Dashboard Principal
 MENU_OPTIONS = {
-    "1": ("Valor atual", "current_price"),
-    "2": ("Dashboard de preco", "price_dashboard"),
-    "3": ("Intraday", "intraday"),
-    "4": ("Log-retornos", "log_returns"),
-    "5": ("Fear & Greed", "fear_and_greed"),
-    "6": ("Mayer Multiple", "mayer_multiple"),
-    "7": ("Halving", "halving"),
-    "8": ("Atualizar banco novamente", "refresh"),
+    "1": ("Dashboard Principal", "principal_dashboard"),
+    "2": ("Valor atual", "current_price"),
+    "3": ("Dashboard de preco", "price_dashboard"),
+    "4": ("Intraday", "intraday"),
+    "5": ("Log-retornos", "log_returns"),
+    "6": ("Fear & Greed", "fear_and_greed"),
+    "7": ("Mayer Multiple", "mayer_multiple"),
+    "8": ("Halving", "halving"),
+    "9": ("Atualizar banco novamente", "refresh"),
     "0": ("Sair", "exit"),
 }
 
@@ -70,6 +72,15 @@ def has_cached_data(db_path="database/bitcoin.db"):
 
     available_tables = {row[0] for row in rows}
     return required_tables.issubset(available_tables)
+
+
+def open_principal_dashboard():
+    """
+    Abre o Dashboard Principal consolidado com KPIs e tendencia.
+    """
+    print_section("Dashboard Principal Executivo")
+    print("Gerando painel mestre. Isso pode levar alguns segundos...")
+    ch.plot_principal_dashboard().show()
 
 
 def show_actual_price():
@@ -180,7 +191,9 @@ def print_main_menu():
 
 
 def dispatch(action):
+    # Dicionario atualizado com a nova acao principal
     actions = {
+        "principal_dashboard": open_principal_dashboard,
         "current_price": show_actual_price,
         "price_dashboard": open_dashboard,
         "intraday": open_intraday,
@@ -223,3 +236,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
